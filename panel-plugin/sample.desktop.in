@@ -1,0 +1,10 @@
+[Xfce Panel]
+Type=X-XFCE-PanelPlugin
+Encoding=UTF-8
+Name=System Updates
+Comment=Shows available system updates
+Icon=system-software-update
+X-XFCE-Module=sample
+X-XFCE-Internal=false
+X-XFCE-Unique=true
+X-XFCE-API=2.0
