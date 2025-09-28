@@ -1,4 +1,5 @@
 [![License](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](https://gitlab.xfce.org/panel-plugins/xfce4-sample-plugin/-/blob/master/COPYING)
+# It supports openSUSE Tumbleweed for now because that's what I am using.
 
 # xfce4-sample-plugin
 
