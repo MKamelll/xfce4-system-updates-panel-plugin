@@ -29,6 +29,8 @@ sample_configure    (XfcePanelPlugin *plugin,
 void
 sample_about        (XfcePanelPlugin *plugin);
 
+void on_icon_size_changed(GtkWidget *spin_button_widget, gpointer user_data);
+
 G_END_DECLS
 
 #endif

@@ -20,31 +20,30 @@
 #ifndef __SAMPLE_H__
 #define __SAMPLE_H__
 
+#include <gtk/gtk.h>
+#include <libxfce4panel/libxfce4panel.h>
+#include <libxfce4util/libxfce4util.h>
+
 G_BEGIN_DECLS
 
 /* plugin structure */
-typedef struct
-{
-    XfcePanelPlugin *plugin;
+typedef struct {
+  XfcePanelPlugin *plugin;
 
-    /* panel widgets */
-    GtkWidget       *ebox;
-    GtkWidget       *hvbox;
-    GtkWidget       *label;
+  /* panel widgets */
+  GtkWidget *ebox;
+  GtkWidget *hvbox;
+  GtkWidget *label;
+  GtkWidget *icon;  
 
-    /* sample settings */
-    GtkWidget       *settings_dialog;
-    gchar           *setting1;
-    gint             setting2;
-    gboolean         setting3;
-}
-SamplePlugin;
+  /* sample settings */
+  GtkWidget *settings_dialog;
+  gchar *setting1;
+  gint icon_size;
+  gboolean setting3;
+} SamplePlugin;
 
-
-
-void
-sample_save (XfcePanelPlugin *plugin,
-             SamplePlugin    *sample);
+void sample_save(XfcePanelPlugin *plugin, SamplePlugin *sample);
 
 G_END_DECLS
 
