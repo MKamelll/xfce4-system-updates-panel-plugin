@@ -50,21 +50,6 @@ static void sample_construct(XfcePanelPlugin *plugin);
 /* register the plugin */
 XFCE_PANEL_PLUGIN_REGISTER(sample_construct);
 
-static void save_last_run_timestamp(XfceRc *rc, time_t last_run) {
-  char buf[DEFAULT_TIMESTAMP_BUF_SIZE];
-  snprintf(buf, sizeof(buf), "%d", (int)last_run);
-  xfce_rc_write_entry(rc, "last_run", buf);
-}
-
-static void load_last_run_timestamp(XfceRc *rc, SamplePlugin *sample) {
-  const char *str = xfce_rc_read_entry(rc, "last_run", NULL);
-  if (!str) {
-    sample->last_run = 0;
-    return;
-  }
-  sample->last_run = (time_t)atoll(str);
-}
-
 static gboolean check_if_time_in_minutes_has_passed(time_t before, time_t after,
                                                     int period_in_minutes) {
   if (difftime(after, before) >= period_in_minutes * 60)
@@ -91,7 +76,12 @@ static void sample_read(SamplePlugin *sample) {
       /* read the settings */
       value = xfce_rc_read_entry(rc, "setting1", DEFAULT_SETTING1);
       sample->setting1 = g_strdup(value);
-      load_last_run_timestamp(rc, sample);
+      const char *str = xfce_rc_read_entry(rc, "last_run", NULL);
+      if (!str) {
+        sample->last_run = 0;
+      } else {
+        sample->last_run = (time_t)atoll(str);
+      }
       sample->period_for_rechecking_in_minutes = xfce_rc_read_int_entry(
           rc, "period_for_rechecking_in_minutes", DEFAULT_PERIOD_IN_MINUTES);
       sample->icon_size =
@@ -281,7 +271,7 @@ static gboolean check_count_of_updates_periodically(gpointer user_data) {
           sample->last_run, now, sample->period_for_rechecking_in_minutes)) {
     gtk_label_set_text(GTK_LABEL(sample->label), "Rechecking");
     count_of_available_updates(sample);
-    sample_save(sample->plugin, sample);
+    sample->last_run = now;
   }
 
   return TRUE;
@@ -357,9 +347,11 @@ void sample_save(XfcePanelPlugin *plugin, SamplePlugin *sample) {
                             sample->period_for_rechecking_in_minutes);
     time_t now = time(NULL);
     if (sample->last_run == 0 ||
-        check_if_time_in_minutes_has_passed(sample->last_run, now,
-                                            sample->period_for_rechecking_in_minutes)) {
-      save_last_run_timestamp(rc, now);
+        check_if_time_in_minutes_has_passed(
+            sample->last_run, now, sample->period_for_rechecking_in_minutes)) {
+      char buf[DEFAULT_TIMESTAMP_BUF_SIZE];
+      snprintf(buf, sizeof(buf), "%d", (int)now);
+      xfce_rc_write_entry(rc, "last_run", buf);
     }
 
     xfce_rc_close(rc);
