@@ -361,5 +361,7 @@ void sample_save(XfcePanelPlugin *plugin, SamplePlugin *sample) {
                                             sample->period_for_rechecking_in_minutes)) {
       save_last_run_timestamp(rc, now);
     }
+
+    xfce_rc_close(rc);
   }
 }
