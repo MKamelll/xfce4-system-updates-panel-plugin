@@ -20,6 +20,7 @@
 #include "glib-object.h"
 #include "glib.h"
 #include "glibconfig.h"
+#include <locale.h>
 #ifdef HAVE_XFCE_REVISION_H
 #include "xfce-revision.h"
 #endif
@@ -65,6 +66,15 @@ static void sample_configure_response(GtkWidget *dialog, gint response,
           gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(spin_button));
     }
 
+    GtkWidget *spin_button_for_period =
+        g_object_get_data(G_OBJECT(dialog), "period-spin");
+
+    if (spin_button_for_period) {
+      sample->period_for_rechecking_in_minutes =
+          gtk_spin_button_get_value_as_int(
+              GTK_SPIN_BUTTON(spin_button_for_period));
+    }
+    
     /* remove the dialog data from the plugin */
     g_object_set_data(G_OBJECT(sample->plugin), "dialog", NULL);
 
@@ -76,16 +86,13 @@ static void sample_configure_response(GtkWidget *dialog, gint response,
   }
 }
 
-void on_icon_size_changed(GtkWidget *spin_button_widget, gpointer user_data)
-{
+void on_icon_size_changed(GtkWidget *spin_button_widget, gpointer user_data) {
   GtkSpinButton *spin_button = GTK_SPIN_BUTTON(spin_button_widget);
   SamplePlugin *sample = user_data;
 
   sample->icon_size = gtk_spin_button_get_value_as_int(spin_button);
   gtk_image_set_pixel_size(GTK_IMAGE(sample->icon), sample->icon_size);
-  
 }
-  
 
 void sample_configure(XfcePanelPlugin *plugin, SamplePlugin *sample) {
   GtkWidget *dialog, *content;
@@ -122,7 +129,7 @@ void sample_configure(XfcePanelPlugin *plugin, SamplePlugin *sample) {
                    G_CALLBACK(sample_configure_response), sample);
 
   content = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
-
+  
   GtkWidget *hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   gtk_container_add(GTK_CONTAINER(content), hbox);
 
@@ -131,14 +138,35 @@ void sample_configure(XfcePanelPlugin *plugin, SamplePlugin *sample) {
   gtk_widget_show(set_icon_size_label);
 
   GtkWidget *spin_button = gtk_spin_button_new_with_range(0, 100, 1);
-  gtk_spin_button_set_wrap(GTK_SPIN_BUTTON(spin_button), TRUE);
+  gtk_spin_button_set_wrap(GTK_SPIN_BUTTON(spin_button), FALSE);
   gtk_spin_button_set_value(GTK_SPIN_BUTTON(spin_button), sample->icon_size);
   gtk_box_pack_start(GTK_BOX(hbox), spin_button, TRUE, FALSE, 0);
-  g_signal_connect(spin_button, "value-changed", G_CALLBACK(on_icon_size_changed), sample);
+  g_signal_connect(spin_button, "value-changed",
+                   G_CALLBACK(on_icon_size_changed), sample);
   gtk_widget_show(spin_button);
 
-  g_object_set_data(G_OBJECT(dialog), "icon-size-spin", spin_button);
   gtk_widget_show(hbox);
+  
+  GtkWidget *hbox2 = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+  gtk_container_add(GTK_CONTAINER(content), hbox2);
+
+  GtkWidget *set_period_in_minutes =
+      gtk_label_new("Rechecking (in minutes)");
+  gtk_box_pack_start(GTK_BOX(hbox2), set_period_in_minutes, TRUE, FALSE, 0);
+  gtk_widget_show(set_period_in_minutes);
+
+  // max is a month
+  GtkWidget *spin_button_for_period =
+      gtk_spin_button_new_with_range(1, 43800, 1);
+  gtk_spin_button_set_wrap(GTK_SPIN_BUTTON(spin_button_for_period), FALSE);
+  gtk_spin_button_set_value(GTK_SPIN_BUTTON(spin_button_for_period),
+                            sample->period_for_rechecking_in_minutes);
+  gtk_box_pack_start(GTK_BOX(hbox2), spin_button_for_period, TRUE, FALSE, 0);
+  gtk_widget_show(spin_button_for_period);
+  gtk_widget_show(hbox2);
+
+  g_object_set_data(G_OBJECT(dialog), "period-spin", spin_button_for_period);
+  g_object_set_data(G_OBJECT(dialog), "icon-size-spin", spin_button);
 
   /* show the entire dialog */
   gtk_widget_show(dialog);

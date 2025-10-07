@@ -41,7 +41,8 @@ typedef struct {
   GtkWidget *settings_dialog;
   gchar *setting1;
   time_t last_run;
-  gint icon_size;
+  int period_for_rechecking_in_minutes;  
+  gint icon_size;  
   gboolean setting3;
 } SamplePlugin;
 
