@@ -30,6 +30,7 @@ void
 sample_about        (XfcePanelPlugin *plugin);
 
 void on_icon_size_changed(GtkWidget *spin_button_widget, gpointer user_data);
+void on_period_change(GtkWidget *spin_button_widget, gpointer user_data);
 
 G_END_DECLS
 

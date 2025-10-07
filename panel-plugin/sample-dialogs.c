@@ -74,7 +74,7 @@ static void sample_configure_response(GtkWidget *dialog, gint response,
           gtk_spin_button_get_value_as_int(
               GTK_SPIN_BUTTON(spin_button_for_period));
     }
-    
+
     /* remove the dialog data from the plugin */
     g_object_set_data(G_OBJECT(sample->plugin), "dialog", NULL);
 
@@ -88,10 +88,17 @@ static void sample_configure_response(GtkWidget *dialog, gint response,
 
 void on_icon_size_changed(GtkWidget *spin_button_widget, gpointer user_data) {
   GtkSpinButton *spin_button = GTK_SPIN_BUTTON(spin_button_widget);
-  SamplePlugin *sample = user_data;
+  SamplePlugin *sample = (SamplePlugin*)user_data;
 
   sample->icon_size = gtk_spin_button_get_value_as_int(spin_button);
   gtk_image_set_pixel_size(GTK_IMAGE(sample->icon), sample->icon_size);
+}
+
+void on_period_change(GtkWidget *spin_button_widget, gpointer user_data) {
+  GtkSpinButton *spin_button = GTK_SPIN_BUTTON(spin_button_widget);
+  SamplePlugin *sample = (SamplePlugin *)user_data;
+
+  sample->period_for_rechecking_in_minutes = gtk_spin_button_get_value_as_int(spin_button);
 }
 
 void sample_configure(XfcePanelPlugin *plugin, SamplePlugin *sample) {
@@ -129,7 +136,7 @@ void sample_configure(XfcePanelPlugin *plugin, SamplePlugin *sample) {
                    G_CALLBACK(sample_configure_response), sample);
 
   content = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
-  
+
   GtkWidget *hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   gtk_container_add(GTK_CONTAINER(content), hbox);
 
@@ -146,12 +153,11 @@ void sample_configure(XfcePanelPlugin *plugin, SamplePlugin *sample) {
   gtk_widget_show(spin_button);
 
   gtk_widget_show(hbox);
-  
+
   GtkWidget *hbox2 = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   gtk_container_add(GTK_CONTAINER(content), hbox2);
 
-  GtkWidget *set_period_in_minutes =
-      gtk_label_new("Rechecking (in minutes)");
+  GtkWidget *set_period_in_minutes = gtk_label_new("Rechecking (in minutes)");
   gtk_box_pack_start(GTK_BOX(hbox2), set_period_in_minutes, TRUE, FALSE, 0);
   gtk_widget_show(set_period_in_minutes);
 
@@ -162,6 +168,9 @@ void sample_configure(XfcePanelPlugin *plugin, SamplePlugin *sample) {
   gtk_spin_button_set_value(GTK_SPIN_BUTTON(spin_button_for_period),
                             sample->period_for_rechecking_in_minutes);
   gtk_box_pack_start(GTK_BOX(hbox2), spin_button_for_period, TRUE, FALSE, 0);
+  g_signal_connect(spin_button_for_period, "value-changed",
+                   G_CALLBACK(on_period_change), sample);
+
   gtk_widget_show(spin_button_for_period);
   gtk_widget_show(hbox2);
 
