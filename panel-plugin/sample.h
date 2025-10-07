@@ -23,6 +23,7 @@
 #include <gtk/gtk.h>
 #include <libxfce4panel/libxfce4panel.h>
 #include <libxfce4util/libxfce4util.h>
+#include <time.h>
 
 G_BEGIN_DECLS
 
@@ -39,6 +40,7 @@ typedef struct {
   /* sample settings */
   GtkWidget *settings_dialog;
   gchar *setting1;
+  time_t last_run;
   gint icon_size;
   gboolean setting3;
 } SamplePlugin;

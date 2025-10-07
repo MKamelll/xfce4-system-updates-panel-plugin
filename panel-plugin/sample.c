@@ -21,6 +21,9 @@
 #include "glibconfig.h"
 #include "libxfce4panel/xfce-panel-plugin.h"
 #include <errno.h>
+#include <locale.h>
+#include <stdio.h>
+#include <time.h>
 #ifdef HAVE_STRING_H
 #include <string.h>
 #endif
@@ -35,7 +38,9 @@
 /* default settings */
 #define DEFAULT_SETTING1 NULL
 #define DEFAULT_ICON_SIZE 12
+#define DEFAULT_PERIOD_IN_MINUTES 10
 #define DEFAULT_SETTING3 FALSE
+#define DEFAULT_TIMESTAMP_BUF_SIZE 64
 
 #define DEFAULT_PANEL_ICON_NAME "system-software-update"
 
@@ -44,6 +49,29 @@ static void sample_construct(XfcePanelPlugin *plugin);
 
 /* register the plugin */
 XFCE_PANEL_PLUGIN_REGISTER(sample_construct);
+
+static void save_last_run_timestamp(XfceRc *rc, time_t last_run) {
+  char buf[DEFAULT_TIMESTAMP_BUF_SIZE];
+  snprintf(buf, sizeof(buf), "%lld", (long long)last_run);
+  xfce_rc_write_entry(rc, "last_run", buf);
+}
+
+static void load_last_run_timestamp(XfceRc *rc, SamplePlugin *sample) {
+  const char *str = xfce_rc_read_entry(rc, "last_run", NULL);
+  if (!str) {
+    sample->last_run = 0;
+    return;
+  }
+  sample->last_run = (time_t)atoll(str);
+}
+
+static gboolean
+check_if_time_in_minutes_has_passed(time_t before, time_t after,
+                                    long long period_in_minutes) {
+  if (difftime(after, before) >= period_in_minutes * 60)
+    return TRUE;
+  return FALSE;
+}
 
 static void sample_read(SamplePlugin *sample) {
   XfceRc *rc;
@@ -64,7 +92,7 @@ static void sample_read(SamplePlugin *sample) {
       /* read the settings */
       value = xfce_rc_read_entry(rc, "setting1", DEFAULT_SETTING1);
       sample->setting1 = g_strdup(value);
-
+      load_last_run_timestamp(rc, sample);
       sample->icon_size =
           xfce_rc_read_int_entry(rc, "icon_size", DEFAULT_ICON_SIZE);
       sample->setting3 =
@@ -166,7 +194,8 @@ static gboolean sample_size_changed(XfcePanelPlugin *plugin, gint size,
 static void on_count_of_available_updates_finished(GObject *source,
                                                    GAsyncResult *result,
                                                    gpointer user_data) {
-  GtkLabel *label = GTK_LABEL(user_data);
+  SamplePlugin *sample = (SamplePlugin *)user_data;
+  GtkLabel *label = GTK_LABEL(sample->label);
   GError *error = NULL;
   gchar *stdout_buff = NULL;
 
@@ -182,7 +211,7 @@ static void on_count_of_available_updates_finished(GObject *source,
   g_object_unref(source);
 }
 
-static void count_of_available_updates(GtkLabel *label) {
+static void count_of_available_updates(SamplePlugin *sample) {
   GError *error = NULL;
 
   GSubprocess *proc =
@@ -190,23 +219,24 @@ static void count_of_available_updates(GtkLabel *label) {
                        "zypper list-updates | wc -l", NULL);
 
   if (!proc) {
-    gtk_label_set_text(GTK_LABEL(label), error->message);
+    gtk_label_set_text(GTK_LABEL(sample->label), error->message);
     g_error_free(error);
     return;
   }
 
   g_subprocess_communicate_utf8_async(
-      proc, NULL, NULL, on_count_of_available_updates_finished, label);
+      proc, NULL, NULL, on_count_of_available_updates_finished, sample);
 }
 
 static void on_system_update(GObject *source, GAsyncResult *result,
                              gpointer user_data) {
   GError *error = NULL;
-  GtkLabel *label = GTK_LABEL(user_data);
+  ;
+  SamplePlugin *sample = (SamplePlugin *)user_data;
 
   if (g_subprocess_communicate_utf8_finish(G_SUBPROCESS(source), result, NULL,
                                            NULL, &error)) {
-    count_of_available_updates(label);
+    count_of_available_updates(sample);
   } else {
     g_printerr("Couldn't finish the system update: %s", error->message);
     g_error_free(error);
@@ -217,8 +247,8 @@ static void on_system_update(GObject *source, GAsyncResult *result,
 
 static gboolean on_plugin_click(GtkWidget *widget, GdkEventButton *event,
                                 gpointer user_data) {
+  SamplePlugin *sample = (SamplePlugin *)user_data;
   GError *error = NULL;
-  GtkLabel *label = GTK_LABEL(user_data);
 
   if (event->type == GDK_BUTTON_PRESS && event->button == 1) {
 
@@ -233,10 +263,25 @@ static gboolean on_plugin_click(GtkWidget *widget, GdkEventButton *event,
     }
 
     g_subprocess_communicate_utf8_async(proc, NULL, NULL, on_system_update,
-                                        label);
+                                        sample);
   }
 
   return FALSE;
+}
+
+static gboolean check_count_of_updates_periodically(gpointer user_data) {
+  SamplePlugin *sample = (SamplePlugin *)user_data;
+  time_t now = time(NULL);
+
+  if (sample->last_run == 0 ||
+      check_if_time_in_minutes_has_passed(sample->last_run, now,
+                                          DEFAULT_PERIOD_IN_MINUTES)) {
+    gtk_label_set_text(GTK_LABEL(sample->label), "Rechecking");
+    count_of_available_updates(sample);
+    sample_save(sample->plugin, sample);
+  }
+
+  return TRUE;
 }
 
 static void sample_construct(XfcePanelPlugin *plugin) {
@@ -254,13 +299,17 @@ static void sample_construct(XfcePanelPlugin *plugin) {
   GtkWidget *label = gtk_label_new("running");
   gtk_widget_show(label);
   gtk_box_pack_start(GTK_BOX(sample->hvbox), label, FALSE, FALSE, 0);
+  sample->label = label;
 
-  count_of_available_updates(GTK_LABEL(label));
+  count_of_available_updates(sample);
 
   gtk_widget_add_events(sample->ebox, GDK_BUTTON_PRESS_MASK);
 
+  g_timeout_add_seconds(DEFAULT_PERIOD_IN_MINUTES * 60,
+                        check_count_of_updates_periodically, sample);
+
   g_signal_connect(sample->ebox, "button-press-event",
-                   G_CALLBACK(on_plugin_click), label);
+                   G_CALLBACK(on_plugin_click), sample);
 
   /* show the panel's right-click menu on this ebox */
   xfce_panel_plugin_add_action_widget(plugin, sample->ebox);
@@ -302,5 +351,11 @@ void sample_save(XfcePanelPlugin *plugin, SamplePlugin *sample) {
 
   if (rc) {
     xfce_rc_write_int_entry(rc, "icon_size", sample->icon_size);
+    time_t now = time(NULL);
+    if (sample->last_run == 0 ||
+        check_if_time_in_minutes_has_passed(sample->last_run, now,
+                                            DEFAULT_PERIOD_IN_MINUTES)) {
+      save_last_run_timestamp(rc, now);
+    }
   }
 }
